@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ENGR 321 Drone Delivery Dashboard</title>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --danger: #dc2626;
+      --success: #16a34a;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; }
+    header { background: var(--primary); color: white; padding: 1rem; text-align: center; font-weight: bold; font-size: 1.2rem; }
+    .container { max-width: 480px; margin: 0 auto; padding: 1rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary-dark); }
+    .form-group { margin-bottom: 0.75rem; }
+    label { display: block; font-size: 0.85rem; margin-bottom: 0.25rem; font-weight: 600; }
+    input, select { width: 100%; padding: 0.6rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; }
+    .btn { display: block; width: 100%; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-align: center; margin-top: 0.5rem; }
+    .btn-danger { background: var(--danger); }
+    .btn-success { background: var(--success); }
+    .status-badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: bold; background: #e0f2fe; color: var(--primary-dark); }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .telemetry { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center; background: #f1f5f9; padding: 0.5rem; border-radius: 6px; margin-bottom: 0.75rem; }
+    .telemetry-item val { font-size: 1rem; font-weight: bold; display: block; }
+    .telemetry-item lbl { font-size: 0.7rem; color: #64748b; }
+    #map-view { width: 100%; height: 200px; background: #cbd5e1; border-radius: 8px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; margin-bottom: 0.75rem; }
+    .drone-icon { position: absolute; font-size: 1.5rem; transition: all 1s linear; }
+    .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 0.5rem 0; }
+    .nav-item { border: none; background: none; font-size: 0.75rem; color: #64748b; cursor: pointer; }
+    .nav-item.active { color: var(--primary); font-weight: bold; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+  </style>
+</head>
+<body>
+
+  <header>Drone Delivery Data Dashboard</header>
+
+  <div class="container">
+    <!-- SCREEN 1: DASHBOARD OVERVIEW -->
+    <div id="screen-home" class="screen active">
+      <div class="card">
+        <h2>System Status</h2>
+        <p>Active Drones: <strong>3/5 Ready</strong></p>
+        <p>Current Airspace: <span class="status-badge">Clear</span></p>
+      </div>
+      <div class="card">
+        <h2>Quick Action</h2>
+        <button class="btn" onclick="switchScreen('screen-order')">Create New Delivery Order</button>
+      </div>
+    </div>
+
+    <!-- SCREEN 2: ORDER INPUT & PRE-FLIGHT -->
+    <div id="screen-order" class="screen">
+      <div class="card">
+        <h2>New Order & Pre-Flight Check</h2>
+        <div class="form-group">
+          <label>Recipient Address / Zone</label>
+          <input type="text" id="dest" value="Campus Quad Zone B">
+        </div>
+        <div class="form-group">
+          <label>Payload Weight (lbs)</label>
+          <input type="number" id="weight" value="2.5" max="5.0">
+        </div>
+        <div class="card" style="background: #f8fafc; border-color: #cbd5e1;">
+          <h2>Automated Pre-Flight Check</h2>
+          <p>✔ Weather / Wind: <strong>4 mph (Pass)</strong></p>
+          <p>✔ Airspace / Geofence: <strong>No-Fly Clear</strong></p>
+          <p>✔ Battery Check: <strong>95% Charged</strong></p>
+        </div>
+        <button class="btn btn-success" onclick="startDelivery()">Confirm & Dispatch Drone</button>
+      </div>
+    </div>
+
+    <!-- SCREEN 3: LIVE FLIGHT TRACKING -->
+    <div id="screen-tracking" class="screen">
+      <div class="card">
+        <h2>Live Flight Tracking</h2>
+        <div class="telemetry">
+          <div class="telemetry-item"><val id="tel-alt">180 ft</val><lbl>ALTITUDE</lbl></div>
+          <div class="telemetry-item"><val id="tel-spd">22 mph</val><lbl>SPEED</lbl></div>
+          <div class="telemetry-item"><val id="tel-bat">92%</val><lbl>BATTERY</lbl></div>
+        </div>
+        <div id="map-view">
+          <div id="drone" class="drone-icon" style="top: 80%; left: 10%;">🚁</div>
+          <span style="position: absolute; top: 10px; right: 10px; font-size: 0.75rem; background: white; padding: 2px 6px; border-radius: 4px;">Destination 📍</span>
+        </div>
+        <button class="btn btn-danger" onclick="abortFlight()">EMERGENCY ABORT / RETURN TO BASE</button>
+      </div>
+    </div>
+
+    <!-- SCREEN 4: CONFIRMATION -->
+    <div id="screen-confirm" class="screen">
+      <div class="card">
+        <h2>Package Arrival Confirmation</h2>
+        <p style="margin-bottom: 0.75rem;">Drone arrived at target drop area. Enter PIN code to trigger package release.</p>
+        <div class="form-group">
+          <label>Enter Recipient PIN</label>
+          <input type="text" id="pin" placeholder="e.g. 4821">
+        </div>
+        <button class="btn btn-success" onclick="completeDelivery()">Verify PIN & Release Payload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVIGATION BAR -->
+  <div class="nav-bar">
+    <button class="nav-item active" onclick="switchScreen('screen-home')">Home</button>
+    <button class="nav-item" onclick="switchScreen('screen-order')">New Order</button>
+    <button class="nav-item" onclick="switchScreen('screen-tracking')">Tracking</button>
+    <button class="nav-item" onclick="switchScreen('screen-confirm')">Confirm</button>
+  </div>
+
+  <script>
+    function switchScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+    }
+
+    let flightInterval;
+    function startDelivery() {
+      switchScreen('screen-tracking');
+      let drone = document.getElementById('drone');
+      let top = 80;
+      let left = 10;
+      let bat = 92;
+
+      flightInterval = setInterval(() => {
+        if (top > 20) top -= 5;
+        if (left < 80) left += 5;
+        bat -= 1;
+        drone.style.top = top + '%';
+        drone.style.left = left + '%';
+        document.getElementById('tel-bat').innerText = bat + '%';
+
+        if (top <= 20 && left >= 80) {
+          clearInterval(flightInterval);
+          setTimeout(() => {
+            alert('Drone reached drop location!');
+            switchScreen('screen-confirm');
+          }, 500);
+        }
+      }, 1000);
+    }
+
+    function abortFlight() {
+      clearInterval(flightInterval);
+      alert('EMERGENCY ABORT INITIATED: Drone returning to home base immediately.');
+      switchScreen('screen-home');
+    }
+
+    function completeDelivery() {
+      let pin = document.getElementById('pin').value;
+      if (pin) {
+        alert('PIN Verified! Package safely released. Delivery marked Complete.');
+        switchScreen('screen-home');
+      } else {
+        alert('Please enter a valid PIN.');
+      }
+    }
+  </script>
+</body>
+</html>
